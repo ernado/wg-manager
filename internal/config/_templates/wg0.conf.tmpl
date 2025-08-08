@@ -1,0 +1,14 @@
+{{- /*gotype: github.com/ernado/wg-manager/internal/config.Config*/ -}}
+[Interface]
+Address = 10.5.5.1/24
+# SaveConfig = true
+PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE; sysctl -q -w net.ipv4.ip_forward=1
+PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+ListenPort = 51820
+PrivateKey = {{ .PrivateKey }}
+
+{{ range $i, $peer := .Peers }}
+[Peer]
+PublicKey = {{ $peer.PublicKey }}
+AllowedIPs = {{ $peer.AllowedIPs }}
+{{ end }}
