@@ -113,6 +113,6 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/ernado/lupanarbot
+        - github.com/ernado/wg-manager
   exclusions:
     generated: strict
