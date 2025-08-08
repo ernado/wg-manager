@@ -15,7 +15,19 @@ import (
 )
 
 func run(ctx context.Context) error {
-	slog.Info("wg-manager started")
+	lg := slog.New(
+		slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			// Drop time key because journald already provides it.
+			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+				if a.Key == slog.TimeKey && len(groups) == 0 {
+					return slog.Attr{}
+				}
+				return a
+			},
+		}),
+	)
+
+	lg.Info("wg-manager started")
 
 	client, err := wgctrl.New()
 	if err != nil {
@@ -34,7 +46,7 @@ func run(ctx context.Context) error {
 	}
 	defer func() {
 		if err := rx.Close(); err != nil {
-			slog.Warn("close rtnl context", "err", err)
+			lg.Warn("close rtnl context", "err", err)
 		}
 	}()
 
@@ -44,7 +56,7 @@ func run(ctx context.Context) error {
 
 	if err := link.Add(rx); err != nil {
 		if errors.Is(err, os.ErrExist) {
-			slog.Info("wg-manager already running")
+			lg.Info("wg-manager already running")
 		} else {
 			return errors.Wrap(err, "add wireguard link")
 		}
@@ -56,7 +68,7 @@ func run(ctx context.Context) error {
 	}
 
 	<-ctx.Done()
-	slog.Info("wg-manager stopped")
+	lg.Info("wg-manager stopped")
 	return ctx.Err()
 }
 
