@@ -1,24 +1,25 @@
 package config
 
 import (
+	_ "embed"
 	"net"
 
-	"golang.org/x/crypto/curve25519"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-type Key [32]byte
-
-func (k Key) PublicKey() Key {
-	var publicKey [32]byte
-	curve25519.ScalarBaseMult(&publicKey, (*[32]byte)(&k))
-	return publicKey
-}
+//go:embed _templates/wg0.conf.tmpl
+var Template string
 
 type Peer struct {
-	AllowedIPs net.IPNet `yaml:"allowedIPs"`
-	PrivateKey Key       `yaml:"privateKey"`
+	AllowedIPs net.IPNet   `yaml:"allowedIPs"`
+	PrivateKey wgtypes.Key `yaml:"privateKey"`
 }
+
+func (p Peer) PublicKey() wgtypes.Key {
+	return p.PrivateKey.PublicKey()
+}
+
 type Config struct {
-	PrivateKey Key    `yaml:"privateKey"`
-	Peers      []Peer `yaml:"peers"`
+	PrivateKey wgtypes.Key `yaml:"privateKey"`
+	Peers      []Peer      `yaml:"peers"`
 }
