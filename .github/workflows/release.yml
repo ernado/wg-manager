@@ -27,6 +27,7 @@ jobs:
 
       - run: git fetch --force --tags
       - run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+      - uses: anchore/sbom-action/download-syft@v0
 
       - name: Install Go
         uses: actions/setup-go@v5
