@@ -16,3 +16,6 @@
 
 prod.atlas.hcl
 secret.yaml
+
+.task
+/wg-manager
