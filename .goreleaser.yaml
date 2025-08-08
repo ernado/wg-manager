@@ -111,3 +111,8 @@ nfpms:
       lintian_overrides:
         - statically-linked-binary
         - changelog-file-missing-in-native-package
+    bindir: /usr/bin
+    contents:
+      - src: ./_systemd/wg-manager.service
+        dst: /etc/systemd/system/wg-manager.service
+        type: config

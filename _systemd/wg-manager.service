@@ -1,0 +1,12 @@
+[Unit]
+Description=WireGuard Manager
+Documentation=https://github.com/ernado/wg-manager
+After=network.target
+
+[Service]
+Restart=always
+ExecStart=/usr/bin/wg-manager
+TimeoutStopSec=20s
+
+[Install]
+WantedBy=multi-user.target
