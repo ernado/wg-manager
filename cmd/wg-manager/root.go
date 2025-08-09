@@ -9,13 +9,16 @@ import (
 	"gitlab.com/mergetb/tech/rtnl"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	"gopkg.in/yaml.v3"
 )
 
 func Root() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "wg-manager",
-		Short: "WireGuard manager.",
-		Long:  "Manager for WireGuard peers.",
+		Use:           "wg-manager",
+		Short:         "WireGuard manager.",
+		Long:          "Manager for WireGuard peers.",
+		SilenceErrors: true,
+		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
@@ -60,14 +63,49 @@ func Root() *cobra.Command {
 
 			if err := link.Add(rx); err != nil {
 				if errors.Is(err, os.ErrExist) {
-					lg.Info("wg-manager already running")
+					lg.Info("wg-manager link already exists")
 				} else {
 					return errors.Wrap(err, "add wireguard link")
 				}
 			}
 
+			var config Config
+			{
+				configData, err := os.ReadFile("/etc/wireguard/wg-manager.yaml")
+				if err != nil {
+					if os.IsNotExist(err) {
+						config.Port = 51820
+
+						configData, err = yaml.Marshal(&config)
+						if err != nil {
+							return errors.Wrap(err, "marshal default config")
+						}
+
+						// Permissions: current user can read and write, others can not read or write.
+						const permissions = 0640
+						if err := os.WriteFile("/etc/wireguard/wg-manager.yaml", configData, permissions); err != nil {
+							return errors.Wrap(err, "write default config")
+						}
+					}
+				} else {
+					if err := yaml.Unmarshal(configData, &config); err != nil {
+						return errors.Wrap(err, "unmarshal config")
+					}
+				}
+			}
+
 			// Configure device.
-			if err := client.ConfigureDevice(link.Info.Name, wgtypes.Config{}); err != nil {
+			var wgConfig wgtypes.Config
+			{
+				if config.PrivateKey != (Key{}) {
+					k := wgtypes.Key(config.PrivateKey)
+					wgConfig.PrivateKey = &(k)
+				}
+				if config.Port != 0 {
+					wgConfig.ListenPort = &config.Port
+				}
+			}
+			if err := client.ConfigureDevice(link.Info.Name, wgConfig); err != nil {
 				return errors.Wrap(err, "configure device")
 			}
 
@@ -76,6 +114,10 @@ func Root() *cobra.Command {
 			return ctx.Err()
 		},
 	}
+
+	cmd.AddCommand(
+		ConfigCommand(),
+	)
 
 	return cmd
 }
