@@ -69,6 +69,10 @@ func Root() *cobra.Command {
 				}
 			}
 
+			if err := link.Up(rx); err != nil {
+				return errors.Wrap(err, "set link up")
+			}
+
 			var config Config
 			{
 				configData, err := os.ReadFile("/etc/wireguard/wg-manager.yaml")
