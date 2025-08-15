@@ -19,3 +19,4 @@ secret.yaml
 
 .task
 /wg-manager
+/easy-wg-quick.bash

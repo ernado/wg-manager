@@ -2,12 +2,29 @@ package main
 
 import (
 	"net"
+	"os"
 
 	"github.com/go-faster/errors"
 	"github.com/spf13/cobra"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"gopkg.in/yaml.v3"
 )
+
+const configPath = "/etc/wireguard/wg-manager.yaml"
+
+func ReadConfig() (*Config, error) {
+	cfg := &Config{}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "read config file")
+	}
+
+	if err := yaml.Unmarshal(data, cfg); err != nil {
+		return nil, errors.Wrap(err, "unmarshal config")
+	}
+
+	return cfg, nil
+}
 
 type Key [wgtypes.KeyLen]byte
 
@@ -70,6 +87,7 @@ type Config struct {
 	Address      IPNet  `yaml:"address"`
 	NATInterface string `yaml:"natInterface,omitempty"`
 	Peers        []Peer `yaml:"peers,omitempty"`
+	Endpoint     string `yaml:"endpoint,omitempty"`
 }
 
 func ConfigCommand() *cobra.Command {

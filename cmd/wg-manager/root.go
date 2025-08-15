@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"log/slog"
 	"net"
@@ -67,6 +68,72 @@ func (a *Application) configureRouting(ctx context.Context, wgInterface, natInte
 	}
 
 	return nil
+}
+
+// detectExternalInterface tries to detect the default external network interface and its IPv4 address (Linux only, no awk).
+func detectExternalInterface() (iface string, ip string, err error) {
+	cmd := exec.Command("ip", "route", "show")
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", "", err
+	}
+	if err := cmd.Start(); err != nil {
+		return "", "", err
+	}
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Looking for: default via 192.168.1.1 dev eth0 ...
+		fields := strings.Fields(line)
+		if len(fields) >= 5 && fields[0] == "default" {
+			for i := 0; i < len(fields)-1; i++ {
+				if fields[i] == "dev" {
+					iface = fields[i+1]
+					break
+				}
+			}
+			if iface != "" {
+				break
+			}
+		}
+	}
+	err = cmd.Wait()
+	if err != nil {
+		return "", "", err
+	}
+	if iface == "" {
+		return "", "", errors.New("could not detect default external interface")
+	}
+
+	// Now detect the external IP for the interface.
+	cmd = exec.Command("ip", "addr", "show", iface)
+	stdout, err = cmd.StdoutPipe()
+	if err != nil {
+		return iface, "", err
+	}
+	if err := cmd.Start(); err != nil {
+		return iface, "", err
+	}
+	scanner = bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		// Look for: inet 192.168.1.100/24 ...
+		if strings.HasPrefix(line, "inet ") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				ip = strings.Split(fields[1], "/")[0]
+				break
+			}
+		}
+	}
+	err = cmd.Wait()
+	if err != nil {
+		return iface, "", err
+	}
+	if ip == "" {
+		return iface, "", errors.New("could not detect external IP address")
+	}
+	return iface, ip, nil
 }
 
 func Root() *cobra.Command {
@@ -160,10 +227,31 @@ func Root() *cobra.Command {
 
 			var config Config
 			{
-				configData, err := os.ReadFile("/etc/wireguard/wg-manager.yaml")
+				configData, err := os.ReadFile(configPath)
 				if err != nil {
 					if os.IsNotExist(err) {
+						lg.Info("Generating default configuration", "path", configPath)
+
+						key, err := wgtypes.GeneratePrivateKey()
+						if err != nil {
+							return errors.Wrap(err, "generate private key")
+						}
+
+						config.PrivateKey = Key(key)
 						config.Port = 51820
+
+						lg.Info("Generated new key", "public_key", config.PrivateKey.Public())
+
+						// Detect default external interface and IP if not set
+						if config.NATInterface == "" {
+							iface, ip, err := detectExternalInterface()
+							if err != nil {
+								return errors.Wrap(err, "detect default external interface")
+							}
+							config.NATInterface = iface
+							config.Endpoint = net.JoinHostPort(ip, "51820")
+							lg.Info("Detected default external interface", "interface", iface, "ip", ip)
+						}
 
 						configData, err = yaml.Marshal(&config)
 						if err != nil {
@@ -172,7 +260,7 @@ func Root() *cobra.Command {
 
 						// Permissions: current user can read and write, others can not read or write.
 						const permissions = 0640
-						if err := os.WriteFile("/etc/wireguard/wg-manager.yaml", configData, permissions); err != nil {
+						if err := os.WriteFile(configPath, configData, permissions); err != nil {
 							return errors.Wrap(err, "write default config")
 						}
 					}
@@ -243,6 +331,7 @@ func Root() *cobra.Command {
 
 	cmd.AddCommand(
 		ConfigCommand(),
+		ClientCommand(),
 	)
 
 	return cmd
