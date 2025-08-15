@@ -71,7 +71,7 @@ func (a *Application) configureRouting(ctx context.Context, wgInterface, natInte
 }
 
 // detectExternalInterface tries to detect the default external network interface and its IPv4 address (Linux only, no awk).
-func detectExternalInterface() (iface string, ip string, err error) {
+func detectExternalInterface() (iface, ip string, err error) {
 	cmd := exec.Command("ip", "route", "show")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
