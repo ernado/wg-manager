@@ -194,6 +194,14 @@ func Root() *cobra.Command {
 					wgConfig.ListenPort = &config.Port
 					wgConfig.FirewallMark = &config.Port
 				}
+				for _, peer := range config.Peers {
+					var peerConfig wgtypes.PeerConfig
+					peerConfig.PublicKey = wgtypes.Key(peer.PrivateKey).PublicKey()
+					peerConfig.AllowedIPs = []net.IPNet{
+						net.IPNet(peer.Address),
+					}
+					wgConfig.Peers = append(wgConfig.Peers, peerConfig)
+				}
 			}
 			if err := client.ConfigureDevice(link.Info.Name, wgConfig); err != nil {
 				return errors.Wrap(err, "configure device")

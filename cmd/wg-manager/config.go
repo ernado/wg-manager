@@ -11,6 +11,10 @@ import (
 
 type Key [wgtypes.KeyLen]byte
 
+func (k Key) Public() wgtypes.Key {
+	return wgtypes.Key(k).PublicKey()
+}
+
 func (k Key) MarshalYAML() (interface{}, error) {
 	return wgtypes.Key(k).String(), nil
 }
@@ -54,11 +58,17 @@ func (n *IPNet) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+type Peer struct {
+	PrivateKey Key   `yaml:"privateKey"`
+	Address    IPNet `yaml:"address"`
+}
+
 type Config struct {
 	PrivateKey   Key    `yaml:"privateKey"`
 	Port         int    `yaml:"port"`
 	Address      IPNet  `yaml:"address"`
 	NATInterface string `yaml:"natInterface,omitempty"`
+	Peers        []Peer `yaml:"peers,omitempty"`
 }
 
 func ConfigCommand() *cobra.Command {
@@ -70,6 +80,20 @@ func ConfigCommand() *cobra.Command {
 			if err != nil {
 				return errors.Wrap(err, "generate private key")
 			}
+
+			peerPrivateKey, err := wgtypes.GeneratePrivateKey()
+			if err != nil {
+				return errors.Wrap(err, "generate peer private key")
+			}
+
+			peer := Peer{
+				PrivateKey: Key(peerPrivateKey),
+				Address: IPNet{
+					IP:   net.IPv4(10, 5, 5, 2),
+					Mask: net.CIDRMask(32, 32),
+				},
+			}
+
 			cfg := Config{
 				PrivateKey: Key(privateKey),
 				Port:       51820,
@@ -78,6 +102,7 @@ func ConfigCommand() *cobra.Command {
 					Mask: net.CIDRMask(24, 32),
 				},
 				NATInterface: "eth0",
+				Peers:        []Peer{peer},
 			}
 
 			e := yaml.NewEncoder(cmd.OutOrStdout())
