@@ -59,8 +59,9 @@ func (n *IPNet) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type Peer struct {
-	PrivateKey Key   `yaml:"privateKey"`
-	Address    IPNet `yaml:"address"`
+	Name       string `yaml:"name,omitempty"`
+	PrivateKey Key    `yaml:"privateKey"`
+	Address    IPNet  `yaml:"address"`
 }
 
 type Config struct {
@@ -87,6 +88,7 @@ func ConfigCommand() *cobra.Command {
 			}
 
 			peer := Peer{
+				Name:       "client",
 				PrivateKey: Key(peerPrivateKey),
 				Address: IPNet{
 					IP:   net.IPv4(10, 5, 5, 2),
